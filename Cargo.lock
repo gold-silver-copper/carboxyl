@@ -155,6 +155,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -233,7 +242,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0348a1c054491f4bfe6ab86a7b6ab1e44e45d899005de92f58b3df180b36ddaf"
 dependencies = [
  "clipboard-win",
- "image",
+ "image 0.25.10",
  "log",
  "objc2",
  "objc2-app-kit",
@@ -697,7 +706,9 @@ version = "0.0.3"
 dependencies = [
  "chrono",
  "dpi",
+ "image 0.24.9",
  "libc",
+ "rascii_art",
  "rustls",
  "servo",
  "unicode-segmentation",
@@ -834,6 +845,46 @@ dependencies = [
  "libc",
  "libloading",
 ]
+
+[[package]]
+name = "clap"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ddb117e43bbf7dacf0a4190fef4d345b9bad68dfc649cb349e7d17d28428e51"
+dependencies = [
+ "clap_builder",
+ "clap_derive",
+]
+
+[[package]]
+name = "clap_builder"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "714a53001bf66416adb0e2ef5ac857140e7dc3a0c48fb28b2f10762fc4b5069f"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "clap_lex",
+ "strsim",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2ce8604710f6733aa641a2b3731eaa1e8b3d9973d5e3565da11800813f997a9"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "clap_lex"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clipboard-win"
@@ -3183,6 +3234,24 @@ dependencies = [
 
 [[package]]
 name = "image"
+version = "0.24.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5690139d2f55868e080017335e4b94cb7414274c74f1669c84fb5feba2c9f69d"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "color_quant",
+ "exr",
+ "gif 0.13.3",
+ "jpeg-decoder",
+ "num-traits",
+ "png 0.17.16",
+ "qoi",
+ "tiff 0.9.1",
+]
+
+[[package]]
+name = "image"
 version = "0.25.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
@@ -3199,7 +3268,7 @@ dependencies = [
  "ravif",
  "rayon",
  "rgb",
- "tiff",
+ "tiff 0.11.3",
  "zune-core 0.5.1",
  "zune-jpeg 0.5.15",
 ]
@@ -3416,6 +3485,15 @@ checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
 dependencies = [
  "getrandom 0.3.4",
  "libc",
+]
+
+[[package]]
+name = "jpeg-decoder"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00810f1d8b74be64b13dbf3db89ac67740615d6c891f0e7b6179326533011a07"
+dependencies = [
+ "rayon",
 ]
 
 [[package]]
@@ -4743,6 +4821,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0c5ccf5294c6ccd63a74f1565028353830a9c2f5eb0c682c355c471726a6e3f"
 
 [[package]]
+name = "qoi"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f6d64c71eb498fe9eae14ce4ec935c555749aef511cca85b5568910d6e48001"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4885,6 +4972,18 @@ name = "range-alloc"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
+
+[[package]]
+name = "rascii_art"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e27f573a36aab4d4f2dd4aae8f44e8c5409a3d2cefce01d116cb11de546b1c65"
+dependencies = [
+ "ansi_term",
+ "clap",
+ "image 0.24.9",
+ "unicode-segmentation",
+]
 
 [[package]]
 name = "rav1e"
@@ -5493,7 +5592,7 @@ dependencies = [
  "env_logger",
  "euclid",
  "gaol",
- "image",
+ "image 0.25.10",
  "ipc-channel",
  "keyboard-types",
  "log",
@@ -5849,7 +5948,7 @@ dependencies = [
  "crossbeam-channel",
  "euclid",
  "http 1.4.0",
- "image",
+ "image 0.25.10",
  "inventory",
  "keyboard-types",
  "log",
@@ -6389,7 +6488,7 @@ dependencies = [
  "dpi",
  "euclid",
  "gleam",
- "image",
+ "image 0.25.10",
  "ipc-channel",
  "log",
  "rayon",
@@ -6428,7 +6527,7 @@ dependencies = [
  "euclid",
  "gleam",
  "glow",
- "image",
+ "image 0.25.10",
  "ipc-channel",
  "log",
  "malloc_size_of_derive",
@@ -6459,7 +6558,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1fa7656e3deae84546d147ea7eeb5373d6ba2fb20bd3ed1ff82a19427aad6b4"
 dependencies = [
  "euclid",
- "image",
+ "image 0.25.10",
  "log",
  "malloc_size_of_derive",
  "serde",
@@ -7152,6 +7251,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "strsim"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
 name = "strum"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7524,6 +7629,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "tiff"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba1310fcea54c6a9a4fd1aad794ecc02c31682f6bfbecdf460bf19533eed1e3e"
+dependencies = [
+ "flate2",
+ "jpeg-decoder",
+ "weezl",
 ]
 
 [[package]]

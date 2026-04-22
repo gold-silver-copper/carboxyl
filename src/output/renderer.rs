@@ -3,8 +3,10 @@ use std::{
     rc::Rc,
 };
 
+use image::{DynamicImage, ImageBuffer, Rgba};
+use rascii_art::{charsets, render_image_to, RenderOptions};
 use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::{
     gfx::{Color, Point, Rect, Size},
@@ -124,15 +126,14 @@ impl Renderer {
     }
 
     /// Draw the background from a pixel array encoded in RGBA8888
-    pub fn draw_background(&mut self, pixels: &[u8], pixels_size: Size, rect: Rect) {
+    pub fn draw_background(&mut self, pixels: &[u8], pixels_size: Size, _rect: Rect) {
         let viewport = self.size.cast::<usize>();
         let pixels_size = pixels_size.cast::<usize>();
-        let target = Size::new(viewport.width * 2, viewport.height * 4);
 
         if pixels_size.width == 0
             || pixels_size.height == 0
-            || target.width == 0
-            || target.height == 0
+            || viewport.width == 0
+            || viewport.height == 0
         {
             return;
         }
@@ -147,64 +148,35 @@ impl Renderer {
             return;
         }
 
-        let dirty_left =
-            ((rect.origin.x.max(0) as f32) * target.width as f32 / pixels_size.width as f32 / 2.0)
-                .floor() as usize;
-        let dirty_top = ((rect.origin.y.max(0) as f32) * target.height as f32
-            / pixels_size.height as f32
-            / 4.0)
-            .floor() as usize;
-        let dirty_right = (((rect.origin.x + rect.size.width as i32).max(0) as f32)
-            * target.width as f32
-            / pixels_size.width as f32
-            / 2.0)
-            .ceil() as usize;
-        let dirty_bottom = (((rect.origin.y + rect.size.height as i32).max(0) as f32)
-            * target.height as f32
-            / pixels_size.height as f32
-            / 4.0)
-            .ceil() as usize;
-
-        let top = dirty_top.min(viewport.height);
-        let left = dirty_left.min(viewport.width);
-        let right = dirty_right.min(viewport.width).max(left);
-        let bottom = dirty_bottom.min(viewport.height).max(top);
-        let row_length = pixels_size.width;
-        let sample = |target_x: usize, target_y: usize| {
-            let source_x = (((target_x as f32 + 0.5) * pixels_size.width as f32)
-                / target.width as f32)
-                .floor() as usize;
-            let source_y = (((target_y as f32 + 0.5) * pixels_size.height as f32)
-                / target.height as f32)
-                .floor() as usize;
-            let x = source_x.min(pixels_size.width - 1);
-            let y = source_y.min(pixels_size.height - 1);
-
-            Color::new(
-                pixels[(x + y * row_length) * 4 + 2],
-                pixels[(x + y * row_length) * 4 + 1],
-                pixels[(x + y * row_length) * 4 + 0],
-            )
-        };
-        let pair = |x, y| sample(x, y).avg_with(sample(x, y + 1));
-
-        for y in top..bottom {
-            let index = (y + 1) * viewport.width;
-            let start = index + left;
-            let end = index + right;
-            let (mut x, y) = (left * 2, y * 4);
-
-            for (_, cell) in &mut self.cells[start..end] {
-                cell.quadrant = (
-                    pair(x + 0, y + 0),
-                    pair(x + 1, y + 0),
-                    pair(x + 1, y + 2),
-                    pair(x + 0, y + 2),
+        let image = match Self::bgra_frame_to_image(pixels, pixels_size) {
+            Some(image) => image,
+            None => {
+                log::error!(
+                    "failed to convert framebuffer into an RGBA image ({}x{})",
+                    pixels_size.width,
+                    pixels_size.height
                 );
-
-                x += 2;
+                return;
             }
+        };
+        let options = RenderOptions::new()
+            .width(viewport.width as u32)
+            .height(viewport.height as u32)
+            .colored(true)
+            .invert(true)
+            .charset(charsets::DEFAULT);
+        let mut frame = String::new();
+
+        if let Err(error) = render_image_to(&image, &mut frame, &options) {
+            log::error!("failed to render framebuffer with rascii: {error}");
+            return;
         }
+
+        self.fill_rect(
+            Rect::new(0, 1, self.size.width, self.size.height),
+            Color::black(),
+        );
+        self.draw_rascii_frame(&frame);
     }
 
     pub fn clear_text(&mut self) {
@@ -313,34 +285,171 @@ impl Renderer {
             }
         }
     }
+
+    fn bgra_frame_to_image(pixels: &[u8], size: Size<usize>) -> Option<DynamicImage> {
+        let mut rgba = Vec::with_capacity(size.width * size.height * 4);
+
+        for chunk in pixels.chunks_exact(4).take(size.width * size.height) {
+            rgba.extend_from_slice(&[chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+
+        let image = ImageBuffer::<Rgba<u8>, Vec<u8>>::from_vec(
+            size.width as u32,
+            size.height as u32,
+            rgba,
+        )?;
+
+        Some(DynamicImage::ImageRgba8(image))
+    }
+
+    fn draw_rascii_frame(&mut self, frame: &str) {
+        let viewport = self.size.cast::<usize>();
+        let black = Color::black();
+        let mut color = black;
+        let mut row = 0usize;
+        let mut col = 0usize;
+        let bytes = frame.as_bytes();
+        let mut index = 0usize;
+
+        while index < bytes.len() && row < viewport.height {
+            match bytes[index] {
+                b'\x1b' => {
+                    index = self.parse_rascii_escape(bytes, index, &mut color);
+                }
+                b'\n' => {
+                    row += 1;
+                    col = 0;
+                    index += 1;
+                }
+                _ => {
+                    let Ok(remaining) = std::str::from_utf8(&bytes[index..]) else {
+                        break;
+                    };
+                    let Some(ch) = remaining.chars().next() else {
+                        break;
+                    };
+                    let width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
+
+                    if col < viewport.width {
+                        self.write_browser_char(row, col, ch, color);
+                    }
+
+                    col = (col + width).min(viewport.width);
+                    index += ch.len_utf8();
+                }
+            }
+        }
+    }
+
+    fn parse_rascii_escape(&self, bytes: &[u8], start: usize, color: &mut Color) -> usize {
+        let Some(b'[') = bytes.get(start + 1).copied() else {
+            return start + 1;
+        };
+        let mut end = start + 2;
+
+        while end < bytes.len() && bytes[end] != b'm' {
+            end += 1;
+        }
+
+        if end >= bytes.len() {
+            return bytes.len();
+        }
+
+        if let Ok(params) = std::str::from_utf8(&bytes[start + 2..end]) {
+            self.apply_sgr(params, color);
+        }
+
+        end + 1
+    }
+
+    fn apply_sgr(&self, params: &str, color: &mut Color) {
+        if params.is_empty() {
+            return;
+        }
+
+        let values = params
+            .split(';')
+            .filter_map(|value| value.parse::<u16>().ok())
+            .collect::<Vec<_>>();
+        let mut index = 0usize;
+
+        while index < values.len() {
+            match values[index] {
+                0 => *color = Color::black(),
+                38 if index + 4 < values.len() && values[index + 1] == 2 => {
+                    *color = Color::new(
+                        values[index + 2] as u8,
+                        values[index + 3] as u8,
+                        values[index + 4] as u8,
+                    );
+                    index += 4;
+                }
+                _ => {}
+            }
+
+            index += 1;
+        }
+    }
+
+    fn write_browser_char(&mut self, row: usize, col: usize, ch: char, color: Color) {
+        let viewport = self.size.cast::<usize>();
+        let width = UnicodeWidthChar::width(ch).unwrap_or(1).max(1);
+        let text = ch.to_string();
+        let foreground = Self::contrast_color(color);
+
+        for char_index in 0..width {
+            let column = col + char_index;
+            if column >= viewport.width {
+                break;
+            }
+
+            let cell_index = (row + 1) * viewport.width + column;
+            let (_, cell) = &mut self.cells[cell_index];
+            cell.quadrant = (color, color, color, color);
+            cell.grapheme = if ch == ' ' {
+                None
+            } else {
+                Some(Rc::new(Grapheme {
+                    char: text.clone(),
+                    index: char_index,
+                    width,
+                    color: foreground,
+                }))
+            };
+        }
+    }
+
+    fn contrast_color(background: Color) -> Color {
+        let luma =
+            0.299 * background.r as f32 + 0.587 * background.g as f32 + 0.114 * background.b as f32;
+
+        if luma >= 140.0 {
+            Color::black()
+        } else {
+            Color::new(255, 255, 255)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn bgra(r: u8, g: u8, b: u8) -> [u8; 4] {
-        [b, g, r, 255]
+    fn rgba(r: u8, g: u8, b: u8) -> [u8; 4] {
+        [r, g, b, 255]
     }
 
     #[test]
-    fn draw_background_scales_full_framebuffer_into_viewport() {
+    fn draw_background_renders_rascii_cells_into_browser_viewport() {
         let mut renderer = Renderer::new();
         renderer.set_size(Size::new(2, 1));
 
         let mut pixels = Vec::new();
-        for _y in 0..4 {
-            for x in 0..8 {
-                let color = if x < 4 {
-                    bgra(255, 0, 0)
-                } else {
-                    bgra(0, 0, 255)
-                };
-                pixels.extend_from_slice(&color);
-            }
+        for color in [rgba(255, 0, 0), rgba(0, 0, 255)] {
+            pixels.extend_from_slice(&color);
         }
 
-        renderer.draw_background(&pixels, Size::new(8, 4), Rect::new(0, 0, 8, 4));
+        renderer.draw_background(&pixels, Size::new(2, 1), Rect::new(0, 0, 2, 1));
 
         let left = &renderer.cells[2].1;
         let right = &renderer.cells[3].1;
@@ -349,5 +458,13 @@ mod tests {
 
         assert_eq!(left.quadrant, (red, red, red, red));
         assert_eq!(right.quadrant, (blue, blue, blue, blue));
+
+        if let Some(grapheme) = &left.grapheme {
+            assert_eq!(grapheme.color, Color::new(255, 255, 255));
+        }
+
+        if let Some(grapheme) = &right.grapheme {
+            assert_eq!(grapheme.color, Color::new(255, 255, 255));
+        }
     }
 }
